@@ -11,7 +11,7 @@ SUBOPCOES_MAP = {
     'opt_06': ['subopt_01', 'subopt_02', 'subopt_03', 'subopt_04']
 }
 
-def extrair_dados_html(html: str, opcao: str, ano: int, subopcao: str = None) -> List[Dict[str, Union[str, List]]]:
+def get_data(html: str, opcao: str, ano: int, subopcao: str = None) -> List[Dict[str, Union[str, List]]]:
     soup = BeautifulSoup(html, 'html.parser')
     tabela = soup.find('table', class_='tb_base tb_dados')
 
