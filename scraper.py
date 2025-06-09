@@ -3,13 +3,10 @@ from typing import List, Dict, Union
 
 # Mapeamento das subopções disponíveis por opção
 SUBOPCOES_MAP = {
-    'opt_01': [],
-    'opt_02': [],
-    'opt_03': [],
-    'opt_04': [],
     'opt_05': ['subopt_01', 'subopt_02', 'subopt_03', 'subopt_04', 'subopt_05'],
     'opt_06': ['subopt_01', 'subopt_02', 'subopt_03', 'subopt_04']
 }
+
 
 def get_data(html: str, opcao: str, ano: int, subopcao: str = None) -> List[Dict[str, Union[str, List]]]:
     soup = BeautifulSoup(html, 'html.parser')
