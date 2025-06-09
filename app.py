@@ -1,51 +1,82 @@
-import os
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-import scraper
+from bs4 import BeautifulSoup
+from typing import List, Dict, Union
 
-app = Flask(__name__)
-CORS(app)
+# Mapeamento das subopções disponíveis por opção
+SUBOPCOES_MAP = {
+    'opt_01': [],
+    'opt_02': [],
+    'opt_03': [],
+    'opt_04': [],
+    'opt_05': ['subopt_01', 'subopt_02', 'subopt_03', 'subopt_04', 'subopt_05'],
+    'opt_06': ['subopt_01', 'subopt_02', 'subopt_03', 'subopt_04']
+}
 
-# Rota principal
-@app.route('/')
-def home():
-    return jsonify({
-        "message": "API de dados da vitivinicultura - Embrapa",
-        "endpoints": {
-            "producao": "/api/producao",
-            "processamento": "/api/processamento",
-            "comercializacao": "/api/comercializacao",
-            "importacao": "/api/importacao",
-            "exportacao": "/api/exportacao"
-        }
-    })
+def extrair_dados_html(html: str, opcao: str, ano: int, subopcao: str = None) -> List[Dict[str, Union[str, List]]]:
+    soup = BeautifulSoup(html, 'html.parser')
+    tabela = soup.find('table', class_='tb_base tb_dados')
 
-# Rotas da API
-@app.route('/api/producao')
-def get_producao():
-    data = scraper.get_data('opt_02')
-    return jsonify(data)
+    if not tabela:
+        return []
 
-@app.route('/api/processamento')
-def get_processamento():
-    data = scraper.get_data('opt_03')
-    return jsonify(data)
+    resultado = []
+    item_atual = None
 
-@app.route('/api/comercializacao')
-def get_comercializacao():
-    data = scraper.get_data('opt_04')
-    return jsonify(data)
+    # Processa corpo da tabela
+    corpo = tabela.find('tbody')
+    if corpo:
+        for linha in corpo.find_all('tr'):
+            # Verifica se é item principal ou subitem
+            cols = linha.find_all(['td', 'th'])
+            if not cols:
+                continue
+                
+            primeira_col = cols[0]
+            is_subitem = 'tb_subitem' in primeira_col.get('class', [])
+            
+            dados = [col.get_text(strip=True) for col in cols]
+            
+            if not is_subitem:
+                # Item principal
+                if item_atual:
+                    resultado.append(item_atual)
+                item_atual = {
+                    'produto': dados[0],
+                    'quantidade': dados[1] if len(dados) > 1 else None,
+                    'ano': ano,
+                    'subitens': []
+                }
+                if subopcao:
+                    item_atual['subopcao'] = subopcao
+            else:
+                # Subitem
+                if item_atual:
+                    item_atual['subitens'].append({
+                        'produto': dados[0],
+                        'quantidade': dados[1] if len(dados) > 1 else None
+                    })
 
-@app.route('/api/importacao')
-def get_importacao():
-    data = scraper.get_data('opt_05')
-    return jsonify(data)
+    # Adiciona o último item processado
+    if item_atual:
+        resultado.append(item_atual)
 
-@app.route('/api/exportacao')
-def get_exportacao():
-    data = scraper.get_data('opt_06')
-    return jsonify(data)
+    # Processa rodapé da tabela (totais)
+    rodape = tabela.find('tfoot')
+    if rodape:
+        totais = []
+        for linha in rodape.find_all('tr'):
+            dados = [col.get_text(strip=True) for col in linha.find_all(['td', 'th'])]
+            if dados:
+                totais.append({
+                    'descricao': dados[0],
+                    'valor': dados[1] if len(dados) > 1 else None
+                })
+        
+        if totais:
+            resultado.append({
+                'tipo': 'total',
+                'ano': ano,
+                'totaizador': totais[0]['valor'],
+                'detalhes': totais
+            })
 
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))  
-    app.run(host='0.0.0.0', port=port)  
+    return resultado
